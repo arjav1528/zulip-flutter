@@ -83,6 +83,29 @@ abstract final class ZulipAction {
       onFailedTitle: zulipLocalizations.errorMarkAsUnreadFailedTitle);
   }
 
+  /// Mark the given narrow as read up to the given message,
+  /// showing feedback to the user on progress or failure.
+  ///
+  /// This is a wrapper around [updateMessageFlagsBackwardFromAnchor];
+  /// for details on the UI feedback, see there.
+  static Future<void> markNarrowAsReadUpToMessage(
+    BuildContext context,
+    Message message,
+    Narrow narrow,
+  ) async {
+    final zulipLocalizations = ZulipLocalizations.of(context);
+    await updateMessageFlagsBackwardFromAnchor(
+      context: context,
+      apiNarrow: narrow.apiEncode(),
+      anchor: NumericAnchor(message.id),
+      includeAnchor: true,
+      op: UpdateMessageFlagsOp.add,
+      flag: MessageFlag.read,
+      onCompletedMessage: zulipLocalizations.markAsReadComplete,
+      progressMessage: zulipLocalizations.markAsReadInProgress,
+      onFailedTitle: zulipLocalizations.errorMarkAsReadFailedTitle);
+  }
+
   /// Add or remove the given flag from the anchor to the end of the narrow,
   /// showing feedback to the user on progress or failure.
   ///
@@ -162,6 +185,114 @@ abstract final class ZulipAction {
           return false;
         }
         anchor = NumericAnchor(result.lastProcessedId!);
+        includeAnchor = false;
+
+        // The task is taking a while, so tell the user we're working on it.
+        // TODO: Ideally we'd have a progress widget here that showed up based
+        //   on actual time elapsed -- so it could appear before the first
+        //   batch returns, if that takes a while -- and that then stuck
+        //   around continuously until the task ends. For now we use a
+        //   series of [SnackBar]s, which may feel a bit janky.
+        //   There is complexity in tracking the status of each [SnackBar],
+        //   due to having no way to determine which is currently active,
+        //   or if there is an active one at all.  Resetting the [SnackBar] here
+        //   results in the same message popping in and out and the user experience
+        //   is better for now if we allow them to run their timer through
+        //   and clear the backlog later.
+        scaffoldMessenger.showSnackBar(SnackBar(behavior: SnackBarBehavior.floating,
+          content: Text(progressMessage)));
+      }
+    } catch (e) {
+      if (!context.mounted) return false;
+      final zulipLocalizations = ZulipLocalizations.of(context);
+      final message = switch (e) {
+        ZulipApiException() => zulipLocalizations.errorServerMessage(e.message),
+        _ => e.toString(), // TODO(#741): extract user-facing message better
+      };
+      showErrorDialog(context: context,
+        title: onFailedTitle,
+        message: message);
+      return false;
+    }
+  }
+
+  /// Add or remove the given flag from the anchor backward to the start of the narrow,
+  /// showing feedback to the user on progress or failure.
+  ///
+  /// This has the semantics of [updateMessageFlagsForNarrow]
+  /// (see https://zulip.com/api/update-message-flags-for-narrow)
+  /// with `numBefore` infinite and `numAfter: 0`.  It operates by calling that
+  /// endpoint with a finite `numBefore` as a batch size, in a loop.
+  ///
+  /// If the operation requires more than one batch, the user is shown progress
+  /// feedback through [SnackBar], using [progressMessage] and [onCompletedMessage].
+  /// If the operation fails, the user is shown an error dialog box with title
+  /// [onFailedTitle].
+  ///
+  /// Returns true just if the operation finished successfully.
+  static Future<bool> updateMessageFlagsBackwardFromAnchor({
+    required BuildContext context,
+    required List<ApiNarrowElement> apiNarrow,
+    required Anchor anchor,
+    required bool includeAnchor,
+    required UpdateMessageFlagsOp op,
+    required MessageFlag flag,
+    required String Function(int) onCompletedMessage,
+    required String progressMessage,
+    required String onFailedTitle,
+  }) async {
+    try {
+      final store = PerAccountStoreWidget.of(context);
+      final connection = store.connection;
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+      int responseCount = 0;
+      int updatedCount = 0;
+      while (true) {
+        final result = await updateMessageFlagsForNarrow(connection,
+          anchor: anchor,
+          includeAnchor: includeAnchor,
+          // There is an upper limit of 5000 messages per batch
+          // (numBefore + numAfter <= 5000) enforced on the server.
+          // See `update_message_flags_in_narrow` in zerver/views/message_flags.py .
+          // We use `numBefore` of 1000 for more responsive feedback,
+          // similar to the forward-processing method.
+          numBefore: 1000,
+          numAfter: 0,
+          narrow: apiNarrow,
+          op: op,
+          flag: flag);
+        if (!context.mounted) {
+          scaffoldMessenger.clearSnackBars();
+          return false;
+        }
+        responseCount++;
+        updatedCount += result.updatedCount;
+
+        if (result.foundOldest) {
+          if (responseCount > 1) {
+            // We previously showed an in-progress [SnackBar], so say we're done.
+            // There may be a backlog of [SnackBar]s accumulated in the queue
+            // so be sure to clear them out here.
+            scaffoldMessenger
+              ..clearSnackBars()
+              ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating,
+                  content: Text(onCompletedMessage(updatedCount))));
+          }
+          return true;
+        }
+
+        if (result.firstProcessedId == null) {
+          final zulipLocalizations = ZulipLocalizations.of(context);
+          // No messages were in the range of the request.
+          // This should be impossible given that `foundOldest` was false
+          // (and that our `numBefore` was positive.)
+          showErrorDialog(context: context,
+            title: onFailedTitle,
+            message: zulipLocalizations.errorInvalidResponse);
+          return false;
+        }
+        anchor = NumericAnchor(result.firstProcessedId!);
         includeAnchor = false;
 
         // The task is taking a while, so tell the user we're working on it.
