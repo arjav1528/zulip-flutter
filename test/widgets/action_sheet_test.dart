@@ -1978,6 +1978,109 @@ void main() {
       });
     });
 
+    group('MarkAsReadUpToHere', () {
+      testWidgets('not visible if message is read', (tester) async {
+        final readMessage = eg.streamMessage(flags: [MessageFlag.read]);
+        await setupToMessageActionSheet(tester, message: readMessage, narrow: TopicNarrow.ofMessage(readMessage));
+
+        check(find.byIcon(Icons.mark_chat_read_outlined).evaluate()).isEmpty();
+      });
+
+      testWidgets('visible if message is not read', (tester) async {
+        final unreadMessage = eg.streamMessage(flags: []);
+        await setupToMessageActionSheet(tester, message: unreadMessage, narrow: TopicNarrow.ofMessage(unreadMessage));
+
+        check(find.byIcon(Icons.mark_chat_read_outlined).evaluate()).single;
+      });
+
+      group('onPressed', () {
+        testWidgets('smoke test', (tester) async {
+          final message = eg.streamMessage(flags: []);
+          await setupToMessageActionSheet(tester, message: message, narrow: TopicNarrow.ofMessage(message));
+
+          connection.prepare(json: UpdateMessageFlagsForNarrowResult(
+            processedCount: 11, updatedCount: 3,
+            firstProcessedId: 1, lastProcessedId: 1980,
+            foundOldest: true, foundNewest: true).toJson());
+
+          await tester.ensureVisible(find.byIcon(Icons.mark_chat_read_outlined, skipOffstage: false));
+          await tester.tap(find.byIcon(Icons.mark_chat_read_outlined, skipOffstage: false));
+          await tester.pumpAndSettle();
+          check(connection.lastRequest).isA<http.Request>()
+            ..method.equals('POST')
+            ..url.path.equals('/api/v1/messages/flags/narrow')
+            ..bodyFields.deepEquals({
+                'anchor': '${message.id}',
+                'include_anchor': 'true',
+                'num_before': '1000',
+                'num_after': '0',
+                'narrow': jsonEncode(resolveApiNarrowForServer(
+                  TopicNarrow.ofMessage(message).apiEncode(),
+                  connection.zulipFeatureLevel!)),
+                'op': 'add',
+                'flag': 'read',
+              });
+        });
+
+        testWidgets('on topic move, acts on new topic', (tester) async {
+          final stream = eg.stream();
+          const topic = 'old topic';
+          final message = eg.streamMessage(flags: [],
+            stream: stream, topic: topic);
+          await setupToMessageActionSheet(tester, message: message,
+            narrow: TopicNarrow.ofMessage(message));
+
+          // Get the action sheet fully deployed while the old narrow applies.
+          // (This way we maximize the range of potential bugs this test can catch,
+          // by giving the code maximum opportunity to latch onto the old topic.)
+          await tester.pumpAndSettle();
+
+          final newStream = eg.stream();
+          const newTopic = 'other topic';
+          connection.prepare(json: eg.newestGetMessagesResult(
+            foundOldest: true,
+            messages: [
+              Message.fromJson(deepToJson(message) as Map<String, dynamic>
+                                 ..['stream_id'] = newStream.streamId
+                                 ..['subject'] = newTopic)
+            ]).toJson());
+          await store.handleEvent(eg.updateMessageEventMoveFrom(
+            newStreamId: newStream.streamId, newTopicStr: newTopic,
+            propagateMode: PropagateMode.changeAll,
+            origMessages: [message]));
+
+          connection.prepare(json: UpdateMessageFlagsForNarrowResult(
+            processedCount: 11, updatedCount: 3,
+            firstProcessedId: 1, lastProcessedId: 1980,
+            foundOldest: true, foundNewest: true).toJson());
+          await tester.tap(find.byIcon(Icons.mark_chat_read_outlined, skipOffstage: false));
+          await tester.pumpAndSettle();
+          check(connection.lastRequest).isA<http.Request>()
+            ..method.equals('POST')
+            ..url.path.equals('/api/v1/messages/flags/narrow')
+            ..bodyFields['narrow'].equals(
+                jsonEncode(resolveApiNarrowForServer(
+                  eg.topicNarrow(newStream.streamId, newTopic).apiEncode(),
+                  connection.zulipFeatureLevel!)));
+        });
+
+        testWidgets('shows error when fails', (tester) async {
+          final message = eg.streamMessage(flags: []);
+          await setupToMessageActionSheet(tester, message: message, narrow: TopicNarrow.ofMessage(message));
+
+          connection.prepare(httpException: http.ClientException('Oops'));
+          final zulipLocalizations = GlobalLocalizations.zulipLocalizations;
+
+          await tester.ensureVisible(find.byIcon(Icons.mark_chat_read_outlined, skipOffstage: false));
+          await tester.tap(find.byIcon(Icons.mark_chat_read_outlined, skipOffstage: false));
+          await tester.pumpAndSettle();
+          checkErrorDialog(tester,
+            expectedTitle: zulipLocalizations.errorMarkAsReadFailedTitle,
+            expectedMessage: 'NetworkException: Oops (ClientException: Oops)');
+        });
+      });
+    });
+
     group('UnrevealMutedMessageButton', () {
       final user = eg.user(userId: 1, fullName: 'User', avatarUrl: '/foo.png');
       final message = eg.streamMessage(sender: user,
