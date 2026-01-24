@@ -253,6 +253,10 @@
   "@actionSheetOptionMarkAsUnread":  {
     "description": "Label for mark as unread button on action sheet."
   },
+  "actionSheetOptionMarkAsReadUpToMessage": "Mark as read up to here",
+  "@actionSheetOptionMarkAsReadUpToMessage": {
+    "description": "Label for mark as read up to here button on action sheet."
+  },
   "actionSheetOptionHideMutedMessage": "Hide muted message again",
   "@actionSheetOptionHideMutedMessage":  {
     "description": "Label for hide muted message again button on action sheet."

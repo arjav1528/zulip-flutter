@@ -228,6 +228,10 @@ class ZulipLocalizationsPl extends ZulipLocalizations {
       'Odtąd oznacz jako nieprzeczytane';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage =>
       'Ukryj ponownie wyciszone wiadomości';
 

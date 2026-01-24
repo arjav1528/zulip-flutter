@@ -227,6 +227,10 @@ class ZulipLocalizationsUk extends ZulipLocalizations {
   String get actionSheetOptionMarkAsUnread => 'Позначити як непрочитане звідси';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage =>
       'Сховати заглушене повідомлення';
 

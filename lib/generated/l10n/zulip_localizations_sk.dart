@@ -221,6 +221,10 @@ class ZulipLocalizationsSk extends ZulipLocalizations {
       'Označiť ako neprečítané od tejto správy';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage => 'Hide muted message again';
 
   @override

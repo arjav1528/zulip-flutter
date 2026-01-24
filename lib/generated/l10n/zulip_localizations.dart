@@ -495,6 +495,12 @@ abstract class ZulipLocalizations {
   /// **'Mark as unread from here'**
   String get actionSheetOptionMarkAsUnread;
 
+  /// Label for mark as read up to here button on action sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read up to here'**
+  String get actionSheetOptionMarkAsReadUpToMessage;
+
   /// Label for hide muted message again button on action sheet.
   ///
   /// In en, this message translates to:

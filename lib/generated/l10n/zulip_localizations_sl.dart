@@ -227,6 +227,10 @@ class ZulipLocalizationsSl extends ZulipLocalizations {
       'Od tu naprej označi kot neprebrano';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage =>
       'Znova skrij utišano sporočilo';
 

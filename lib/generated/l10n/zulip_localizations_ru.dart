@@ -230,6 +230,10 @@ class ZulipLocalizationsRu extends ZulipLocalizations {
       'Отметить как непрочитанные начиная отсюда';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage =>
       'Скрыть заглушенное сообщение';
 

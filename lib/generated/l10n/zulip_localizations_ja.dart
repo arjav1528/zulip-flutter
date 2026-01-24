@@ -216,6 +216,10 @@ class ZulipLocalizationsJa extends ZulipLocalizations {
   String get actionSheetOptionMarkAsUnread => 'ここから未読にする';
 
   @override
+  String get actionSheetOptionMarkAsReadUpToMessage =>
+      'Mark as read up to here';
+
+  @override
   String get actionSheetOptionHideMutedMessage => 'ミュートしたメッセージを再び非表示にする';
 
   @override
