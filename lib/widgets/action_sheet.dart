@@ -1084,6 +1084,8 @@ void showMessageActionSheet({required BuildContext context, required Message mes
         QuoteAndReplyButton(message: message, pageContext: pageContext),
       if (isMessageRead)
         MarkAsUnreadButton(message: message, pageContext: pageContext),
+      if (!isMessageRead)
+        MarkAsReadUpToHereButton(message: message, pageContext: pageContext),
       if (isSenderMuted)
         // The message must have been revealed in order to open this action sheet.
         UnrevealMutedMessageButton(message: message, pageContext: pageContext),
@@ -1466,6 +1468,24 @@ class MarkAsUnreadButton extends MessageActionSheetMenuItemButton {
       message, messageListPage.narrow));
     // TODO should we alert the user about this change somehow? A snackbar?
     messageListPage.markReadOnScroll = false;
+  }
+}
+
+class MarkAsReadUpToHereButton extends MessageActionSheetMenuItemButton {
+  MarkAsReadUpToHereButton({super.key, required super.message, required super.pageContext});
+
+  @override IconData get icon => Icons.mark_chat_read_outlined;
+
+  @override
+  String label(ZulipLocalizations zulipLocalizations) {
+    return zulipLocalizations.actionSheetOptionMarkAsReadUpToMessage;
+  }
+
+  @override
+  void onPressed() async {
+    final messageListPage = findMessageListPage();
+    unawaited(ZulipAction.markNarrowAsReadUpToMessage(pageContext,
+      message, messageListPage.narrow));
   }
 }
 
